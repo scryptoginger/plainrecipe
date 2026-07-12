@@ -8,11 +8,11 @@ The extractor reads the `schema.org/Recipe` JSON-LD that recipe publishers provi
 
 - Next.js App Router and TypeScript, deployed on Vercel
 - Neon Postgres accessed only by server-side API routes using parameterized SQL
-- Anthropic Haiku for long-description condensation; short descriptions skip the API call
+- Gemini 2.5 Flash for long-description condensation; short descriptions skip the API call
 - Cheerio for JSON-LD extraction
 - Serwist for installation, caching, and an offline shell
 
-The browser never receives the Neon connection string or an Anthropic key and never connects to Neon directly. All reads and writes pass through server-only API routes. Do not prefix any application credentials with `NEXT_PUBLIC_`.
+The browser never receives the Neon connection string or a Gemini key and never connects to Neon directly. All reads and writes pass through server-only API routes. Do not prefix any application credentials with `NEXT_PUBLIC_`.
 
 ## Environment variables
 
@@ -21,7 +21,7 @@ Copy `.env.example` to `.env.local` for local development. `.env.local` is gitig
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Neon Postgres connection string; server-only secret |
-| `ANTHROPIC_API_KEY` | Optional Anthropic credential used by the condenser; recipes still save without it |
+| `GEMINI_API_KEY` | Optional Google AI Studio key for Gemini condensation; recipes still save without it |
 | `ADMIN_SECRET` | Shared delete credential; server-only secret |
 | `RATE_LIMIT_PER_DAY` | Optional per-IP daily cap for new extractions; defaults to `15` |
 
@@ -56,17 +56,21 @@ Serwist is disabled during development and is built by the production command. N
 ## Deploy to Vercel
 
 1. Import `scryptoginger/plainrecipe` into Vercel.
-2. In **Project Settings → Environment Variables**, add `DATABASE_URL` and `ADMIN_SECRET` for Production. Add `ANTHROPIC_API_KEY` if AI condensation is wanted; recipes still save without it. Optionally override `RATE_LIMIT_PER_DAY`.
+2. In **Project Settings → Environment Variables**, add `DATABASE_URL` and `ADMIN_SECRET` for Production. Add a free-tier Google AI Studio `GEMINI_API_KEY` if AI condensation is wanted; recipes still save without it. Optionally override `RATE_LIMIT_PER_DAY`.
 3. Alternatively, install Neon through the Vercel Marketplace integration; it provisions and injects `DATABASE_URL` automatically.
 4. Run the schema in Neon before using the app.
 5. Redeploy after setting or changing environment variables. Vercel only applies environment changes to a fresh build.
 6. Open `/api/recipes` after deployment. A `[]` response instead of a 500 confirms Neon is connected and the tables exist.
 
-**Vercel environment variables must be set before the first successful deployment or the API routes will return errors.** Do not expose the database, Anthropic, or admin values as client variables.
+**Vercel environment variables must be set before the first successful deployment or the API routes will return errors.** Do not expose the database, Gemini, or admin values as client variables.
 
 ## Using the app
 
-Paste an HTTP or HTTPS recipe URL and choose **Clean it.** A canonicalized URL is checked against saved recipes first. A match returns immediately without fetching the source, calling Anthropic, or consuming the daily rate limit. New recipes count toward the submitting IP’s daily limit.
+Paste an HTTP or HTTPS recipe URL and choose **Clean it.** After any short-link resolution, the canonical source URL is checked against saved recipes first. A match returns without fetching the recipe page, calling Gemini, or consuming the daily rate limit. New recipes count toward the submitting IP’s daily limit.
+
+### Supported links
+
+Recipe-page URLs work directly, and common short links such as bit.ly, TinyURL, t.co, and pin.it are followed to their destination. Pinterest resolution is best-effort: PlainRecipe tries the redirected pin page and two alternate browser-like HTTP fetches, scanning each response for the original source. If Pinterest blocks all attempts or a native pin has no outbound link, the app explains that it could not trace the source; open the pin, tap through to the recipe site, and paste that page URL instead.
 
 Search matches saved recipe titles case-insensitively. Full-text ingredient search is deferred.
 
