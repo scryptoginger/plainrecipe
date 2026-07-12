@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function OfflinePage() {
   return (
     <main className="offline">
@@ -5,7 +7,7 @@ export default function OfflinePage() {
       <p className="eyebrow">You are offline</p>
       <h1>The kitchen shelf needs a connection.</h1>
       <p>Reconnect to clean a new page or load saved recipes.</p>
-      <a href="/">Try again</a>
+      <Link href="/">Try again</Link>
     </main>
   );
 }

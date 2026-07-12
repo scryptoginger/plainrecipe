@@ -1,5 +1,3 @@
-import "server-only";
-
 import * as cheerio from "cheerio";
 
 import type { ExtractResult, Recipe } from "@/lib/types";
