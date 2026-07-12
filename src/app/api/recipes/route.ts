@@ -2,37 +2,41 @@ import { NextResponse } from "next/server";
 
 import { getClientIp } from "@/lib/client-ip";
 import { condense } from "@/lib/condense";
+import { db } from "@/lib/db";
 import { extractRecipe } from "@/lib/extract";
 import { toStoredRecipe, type RecipeRow } from "@/lib/recipe-record";
-import { supabase } from "@/lib/supabase-server";
 import { canonicalizeUrl } from "@/lib/url";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 async function findByCanonicalUrl(canonicalUrl: string) {
-  const { data, error } = await supabase
-    .from("recipes")
-    .select("*")
-    .eq("canonical_url", canonicalUrl)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? toStoredRecipe(data as RecipeRow) : null;
+  const sql = db();
+  const rows = (await sql`
+    select * from recipes where canonical_url = ${canonicalUrl} limit 1
+  `) as RecipeRow[];
+  return rows[0] ? toStoredRecipe(rows[0]) : null;
 }
 
 export async function GET(request: Request) {
-  const q = new URL(request.url).searchParams.get("q")?.trim();
-  let query = supabase.from("recipes").select("*").order("created_at", {
-    ascending: false,
-  });
-  if (q) query = query.ilike("title", `%${q.replace(/[%_]/g, "")}%`);
-
-  const { data, error } = await query;
-  if (error) {
+  const raw = new URL(request.url).searchParams.get("q")?.trim();
+  const q = raw ? raw.replace(/[%_]/g, "") : "";
+  try {
+    const sql = db();
+    const rows = (q
+      ? await sql`
+          select * from recipes
+          where title ilike ${"%" + q + "%"}
+          order by created_at desc
+        `
+      : await sql`
+          select * from recipes order by created_at desc
+        `) as RecipeRow[];
+    return NextResponse.json(rows.map(toStoredRecipe));
+  } catch (error) {
     console.error("[recipes] list failed", error);
     return NextResponse.json({ error: "Could not load recipes." }, { status: 500 });
   }
-  return NextResponse.json((data as RecipeRow[]).map(toStoredRecipe));
 }
 
 export async function POST(request: Request) {
@@ -51,21 +55,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    const sql = db();
+
     const cached = await findByCanonicalUrl(canonicalUrl);
     if (cached) return NextResponse.json({ recipe: cached, cached: true });
 
     const ip = getClientIp(request);
     const configuredLimit = Number.parseInt(process.env.RATE_LIMIT_PER_DAY ?? "15", 10);
-    const maxPerDay = Number.isFinite(configuredLimit) && configuredLimit > 0
-      ? configuredLimit
-      : 15;
-    const { data: rateRows, error: rateError } = await supabase.rpc(
-      "increment_rate_limit",
-      { client_ip: ip, max_per_day: maxPerDay },
-    );
-    if (rateError) throw rateError;
-    const rate = Array.isArray(rateRows) ? rateRows[0] : rateRows;
-    if (!rate?.allowed) {
+    const maxPerDay =
+      Number.isFinite(configuredLimit) && configuredLimit > 0 ? configuredLimit : 15;
+
+    const rateRows = (await sql`
+      select * from increment_rate_limit(${ip}, ${maxPerDay})
+    `) as { allowed: boolean; current_count: number }[];
+    if (!rateRows[0]?.allowed) {
       return NextResponse.json(
         { error: "Daily recipe limit reached. Please try again tomorrow." },
         { status: 429 },
@@ -94,36 +97,33 @@ export async function POST(request: Request) {
       title: recipe.title,
       ingredients: recipe.ingredients,
     });
-    const { data, error } = await supabase
-      .from("recipes")
-      .insert({
-        canonical_url: recipe.canonicalUrl,
-        source_url: recipe.sourceUrl,
-        title: recipe.title,
-        summary,
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
-        image_url: recipe.imageUrl,
-        total_time: recipe.totalTime,
-        recipe_yield: recipe.recipeYield,
-        author: recipe.author,
-        created_by_ip: ip,
-      })
-      .select("*")
-      .single();
 
-    if (error) {
-      if (error.code === "23505") {
+    try {
+      const rows = (await sql`
+        insert into recipes (
+          canonical_url, source_url, title, summary,
+          ingredients, instructions, image_url,
+          total_time, recipe_yield, author, created_by_ip
+        ) values (
+          ${recipe.canonicalUrl}, ${recipe.sourceUrl}, ${recipe.title}, ${summary},
+          ${JSON.stringify(recipe.ingredients)}::jsonb,
+          ${JSON.stringify(recipe.instructions)}::jsonb,
+          ${recipe.imageUrl}, ${recipe.totalTime}, ${recipe.recipeYield},
+          ${recipe.author}, ${ip}
+        )
+        returning *
+      `) as RecipeRow[];
+      return NextResponse.json(
+        { recipe: toStoredRecipe(rows[0]), cached: false },
+        { status: 201 },
+      );
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
         const raced = await findByCanonicalUrl(canonicalUrl);
         if (raced) return NextResponse.json({ recipe: raced, cached: true });
       }
       throw error;
     }
-
-    return NextResponse.json(
-      { recipe: toStoredRecipe(data as RecipeRow), cached: false },
-      { status: 201 },
-    );
   } catch (error) {
     console.error("[recipes] add failed", error);
     return NextResponse.json({ error: "Could not save this recipe." }, { status: 500 });
