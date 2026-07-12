@@ -128,7 +128,15 @@ export default function RecipeApp() {
 }
 
 function RecipeView({ recipe }: { recipe: StoredRecipe }) {
-  return <article className="recipe-view" aria-labelledby="recipe-title">
+  const printWords = [recipe.summary, ...recipe.ingredients, ...recipe.instructions]
+    .filter(Boolean)
+    .join(" ")
+    .split(/\s+/).length;
+  const printLoad = printWords + recipe.ingredients.length * 4 + recipe.instructions.length * 8;
+  const printDensity = printLoad > 850 ? "print-tight" : printLoad > 520 ? "print-compact" : "print-regular";
+  const ingredientDensity = recipe.ingredients.length > 14 ? "print-many-ingredients" : "";
+
+  return <article className={`recipe-view ${printDensity} ${ingredientDensity}`} aria-labelledby="recipe-title">
     <div className="recipe-intro"><div><span className="eyebrow">Cleaned recipe</span><h2 id="recipe-title">{recipe.title}</h2>
       <p className="byline">{[recipe.author && `By ${recipe.author}`, recipe.totalTime, recipe.recipeYield].filter(Boolean).join(" · ")}</p></div>
       <div className="recipe-actions">
