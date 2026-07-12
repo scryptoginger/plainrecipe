@@ -1,18 +1,18 @@
 # PlainRecipe
 
-PlainRecipe turns a cluttered recipe page into the useful part: one short context paragraph, ingredients, and steps. It saves cleaned recipes in Supabase, supports title search and admin-only deletion, and installs as a mobile PWA.
+PlainRecipe turns a cluttered recipe page into the useful part: one short context paragraph, ingredients, and steps. It saves cleaned recipes in Neon Postgres, supports title search and admin-only deletion, and installs as a mobile PWA.
 
 The extractor reads the `schema.org/Recipe` JSON-LD that recipe publishers provide to search engines. It does not run a headless browser, load source pages in the background, or reproduce their ads. Every recipe keeps a prominent **Open original** link back to its author.
 
 ## Architecture and security
 
 - Next.js App Router and TypeScript, deployed on Vercel
-- Supabase Postgres accessed only by server-side API routes
+- Neon Postgres accessed only by server-side API routes using parameterized SQL
 - Anthropic Haiku for long-description condensation; short descriptions skip the API call
 - Cheerio for JSON-LD extraction
 - Serwist for installation, caching, and an offline shell
 
-The browser never receives Supabase credentials or an Anthropic key and never connects to Supabase directly. Supabase RLS is enabled with no permissive anonymous policies; the server-only service-role client bypasses RLS. Do not prefix any of the application credentials with `NEXT_PUBLIC_`.
+The browser never receives the Neon connection string or an Anthropic key and never connects to Neon directly. All reads and writes pass through server-only API routes. Do not prefix any application credentials with `NEXT_PUBLIC_`.
 
 ## Environment variables
 
@@ -20,22 +20,21 @@ Copy `.env.example` to `.env.local` for local development. `.env.local` is gitig
 
 | Variable | Purpose |
 | --- | --- |
-| `SUPABASE_URL` | Supabase project URL, used only by server routes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role credential; server-only secret |
-| `ANTHROPIC_API_KEY` | Anthropic credential used by the condenser; server-only secret |
+| `DATABASE_URL` | Neon Postgres connection string; server-only secret |
+| `ANTHROPIC_API_KEY` | Optional Anthropic credential used by the condenser; recipes still save without it |
 | `ADMIN_SECRET` | Shared delete credential; server-only secret |
 | `RATE_LIMIT_PER_DAY` | Optional per-IP daily cap for new extractions; defaults to `15` |
 
-All credentials stay server-side. Although the Supabase project URL is not itself a secret, it is intentionally kept behind this app’s API boundary along with the three secret values.
+All credentials stay server-side. The pooled Neon connection string is supported and recommended for serverless deployments.
 
-## Supabase setup
+## Neon setup
 
-1. Create a Supabase project.
-2. Open its SQL editor.
-3. Run [`supabase/schema.sql`](supabase/schema.sql) once.
-4. Copy the project URL and service-role key from the Supabase project settings into the matching environment variables.
+1. Create a project at [neon.tech](https://neon.tech).
+2. Open the Neon SQL Editor.
+3. Run [`supabase/schema.sql`](supabase/schema.sql) once. The filename is historical; it is plain Postgres SQL and runs on Neon unchanged.
+4. Copy the connection string from the Neon dashboard and set it as `DATABASE_URL`. The pooled connection string is fine.
 
-The SQL creates the recipes table, canonical-URL uniqueness constraint, per-IP/day counter, atomic `increment_rate_limit` RPC, indexes, and RLS lockdown.
+The SQL creates the recipes table, canonical-URL uniqueness constraint, per-IP/day counter, atomic `increment_rate_limit` function, indexes, and defense-in-depth RLS settings.
 
 ## Local development
 
@@ -57,11 +56,13 @@ Serwist is disabled during development and is built by the production command. N
 ## Deploy to Vercel
 
 1. Import `scryptoginger/plainrecipe` into Vercel.
-2. In **Project Settings → Environment Variables**, set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, and `ADMIN_SECRET`. Optionally override `RATE_LIMIT_PER_DAY`.
-3. Apply the Supabase schema before using the app.
-4. Redeploy if the first deployment started before the variables were added.
+2. In **Project Settings → Environment Variables**, add `DATABASE_URL` and `ADMIN_SECRET` for Production. Add `ANTHROPIC_API_KEY` if AI condensation is wanted; recipes still save without it. Optionally override `RATE_LIMIT_PER_DAY`.
+3. Alternatively, install Neon through the Vercel Marketplace integration; it provisions and injects `DATABASE_URL` automatically.
+4. Run the schema in Neon before using the app.
+5. Redeploy after setting or changing environment variables. Vercel only applies environment changes to a fresh build.
+6. Open `/api/recipes` after deployment. A `[]` response instead of a 500 confirms Neon is connected and the tables exist.
 
-**Vercel environment variables must be set before the first successful deployment or the API routes will return errors.** Do not expose the service-role, Anthropic, or admin values as client variables.
+**Vercel environment variables must be set before the first successful deployment or the API routes will return errors.** Do not expose the database, Anthropic, or admin values as client variables.
 
 ## Using the app
 
@@ -91,4 +92,4 @@ The extractor supports bare JSON-LD objects, arrays, and `@graph`; string and st
 - Postgres `tsvector` full-text search across titles and ingredients
 - Content-hash deduplication across different URLs
 - Tags, collections, and a screen-on step-by-step cook mode
-- Supabase Auth if the shared admin secret becomes too limited
+- Managed authentication if the shared admin secret becomes too limited
