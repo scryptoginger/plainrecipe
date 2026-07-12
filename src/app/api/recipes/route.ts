@@ -5,6 +5,7 @@ import { condense } from "@/lib/condense";
 import { db } from "@/lib/db";
 import { extractRecipe } from "@/lib/extract";
 import { toStoredRecipe, type RecipeRow } from "@/lib/recipe-record";
+import { resolveSourceUrl } from "@/lib/resolve";
 import { canonicalizeUrl } from "@/lib/url";
 
 export const runtime = "nodejs";
@@ -40,13 +41,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let url: string;
-  let canonicalUrl: string;
+  let inputUrl: string;
   try {
     const body = (await request.json()) as { url?: unknown };
     if (typeof body.url !== "string" || !body.url.trim()) throw new Error("missing");
-    url = body.url.trim();
-    canonicalUrl = canonicalizeUrl(url);
+    inputUrl = body.url.trim();
+    canonicalizeUrl(inputUrl); // validates http(s); throws → 400 below
   } catch {
     return NextResponse.json(
       { error: "Enter a valid HTTP or HTTPS recipe URL." },
@@ -56,6 +56,23 @@ export async function POST(request: Request) {
 
   try {
     const sql = db();
+
+    // Resolve pin.it / shorteners / Pinterest pins to the underlying recipe URL.
+    const resolved = await resolveSourceUrl(inputUrl);
+    if (!resolved.ok) {
+      return NextResponse.json(
+        {
+          error:
+            "This looks like a Pinterest pin we couldn't trace to a source recipe. " +
+            "We tried the pin page and two alternate fetches. Open the pin, tap " +
+            "through to the recipe site, and paste that page's URL.",
+          reason: "pinterest_unresolved",
+        },
+        { status: 422 },
+      );
+    }
+    const targetUrl = resolved.url;
+    const canonicalUrl = canonicalizeUrl(targetUrl);
 
     const cached = await findByCanonicalUrl(canonicalUrl);
     if (cached) return NextResponse.json({ recipe: cached, cached: true });
@@ -75,9 +92,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const extracted = await extractRecipe(url);
+    const extracted = await extractRecipe(targetUrl);
     if (!extracted.ok) {
-      console.warn(`[extract] ${extracted.reason}: ${url}`);
+      console.warn(`[extract] ${extracted.reason}: ${targetUrl}`);
       const status = extracted.reason === "no_recipe" ? 422 : 502;
       return NextResponse.json(
         {
