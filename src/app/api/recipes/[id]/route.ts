@@ -2,8 +2,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { db } from "@/lib/db";
 import { toStoredRecipe, type RecipeRow } from "@/lib/recipe-record";
-import { supabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -18,17 +18,17 @@ export async function GET(
   context: RouteContext<"/api/recipes/[id]">,
 ) {
   const { id } = await context.params;
-  const { data, error } = await supabase
-    .from("recipes")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) {
+  try {
+    const sql = db();
+    const rows = (await sql`
+      select * from recipes where id = ${id}::uuid limit 1
+    `) as RecipeRow[];
+    if (!rows[0]) return NextResponse.json({ error: "Recipe not found." }, { status: 404 });
+    return NextResponse.json(toStoredRecipe(rows[0]));
+  } catch (error) {
     console.error("[recipes] get failed", error);
     return NextResponse.json({ error: "Could not load recipe." }, { status: 500 });
   }
-  if (!data) return NextResponse.json({ error: "Recipe not found." }, { status: 404 });
-  return NextResponse.json(toStoredRecipe(data as RecipeRow));
 }
 
 export async function DELETE(
@@ -42,10 +42,12 @@ export async function DELETE(
   }
 
   const { id } = await context.params;
-  const { error } = await supabase.from("recipes").delete().eq("id", id);
-  if (error) {
+  try {
+    const sql = db();
+    await sql`delete from recipes where id = ${id}::uuid`;
+    return new Response(null, { status: 204 });
+  } catch (error) {
     console.error("[recipes] delete failed", error);
     return NextResponse.json({ error: "Could not delete recipe." }, { status: 500 });
   }
-  return new Response(null, { status: 204 });
 }
