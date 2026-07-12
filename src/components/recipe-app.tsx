@@ -131,7 +131,10 @@ function RecipeView({ recipe }: { recipe: StoredRecipe }) {
   return <article className="recipe-view" aria-labelledby="recipe-title">
     <div className="recipe-intro"><div><span className="eyebrow">Cleaned recipe</span><h2 id="recipe-title">{recipe.title}</h2>
       <p className="byline">{[recipe.author && `By ${recipe.author}`, recipe.totalTime, recipe.recipeYield].filter(Boolean).join(" · ")}</p></div>
-      <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="original">Open original ↗</a></div>
+      <div className="recipe-actions">
+        <button type="button" className="print-button" onClick={() => window.print()}>Print Recipe</button>
+        <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="original">Open original ↗</a>
+      </div></div>
     {recipe.summary && <p className="summary">{recipe.summary}</p>}
     {recipe.imageUrl && <img className="recipe-image" src={recipe.imageUrl} alt="" />}
     <div className="recipe-columns">
