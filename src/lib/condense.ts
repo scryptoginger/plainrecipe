@@ -1,12 +1,19 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
-
 type CondenseInput = {
   description: string | null;
   title: string;
   ingredients?: string[];
 };
+
+// gemini-2.5-flash: stable, free-tier, good quality for short summaries.
+// For more daily headroom you can switch to "gemini-2.5-flash-lite".
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const SYSTEM_INSTRUCTION =
+  "Summarize into one short paragraph of only useful recipe context. " +
+  "No preamble, no life story, no marketing.";
 
 function isAlreadyShort(description: string): boolean {
   const sentences = description.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [];
@@ -21,7 +28,7 @@ export async function condense({
   const cleanDescription = description?.replace(/\s+/g, " ").trim() || null;
   if (cleanDescription && isAlreadyShort(cleanDescription)) return cleanDescription;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   const source = [
@@ -35,23 +42,36 @@ export async function condense({
     .join("\n");
 
   try {
-    const anthropic = new Anthropic({ apiKey });
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 256,
-      system:
-        "Summarize into one short paragraph of only useful recipe context. No preamble, no life story, no marketing.",
-      messages: [{ role: "user", content: source }],
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        contents: [{ role: "user", parts: [{ text: source }] }],
+        generationConfig: { maxOutputTokens: 256, temperature: 0.4 },
+      }),
+      signal: AbortSignal.timeout(20_000),
     });
-    const summary = message.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
+
+    if (!response.ok) {
+      console.error("[condense] Gemini request failed", response.status);
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const summary = (data.candidates?.[0]?.content?.parts ?? [])
+      .map((part) => part.text ?? "")
       .join(" ")
       .replace(/\s+/g, " ")
       .trim();
     return summary || null;
   } catch (error) {
-    console.error("[condense] Anthropic request failed", error);
+    console.error("[condense] Gemini request error", error);
     return null;
   }
 }
