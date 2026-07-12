@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,7 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "PlainRecipe — just the recipe",
   description: "Clean recipes without ads, preambles, or clutter.",
+  applicationName: "PlainRecipe",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "PlainRecipe" },
 };
+
+export const viewport: Viewport = { themeColor: "#1e201b" };
 
 export default function RootLayout({
   children,
