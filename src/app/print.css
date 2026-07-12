@@ -1,0 +1,219 @@
+@media print {
+  @page {
+    size: auto;
+    margin: 0.35in 0.4in;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    print-color-adjust: economy;
+    -webkit-print-color-adjust: economy;
+  }
+
+  body * {
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .masthead,
+  .cleaner,
+  .library,
+  footer,
+  .recipe-actions,
+  .recipe-image,
+  .recipe-intro .eyebrow {
+    display: none !important;
+  }
+
+  .app-shell {
+    min-height: 0 !important;
+  }
+
+  .recipe-view {
+    display: grid !important;
+    grid-template-columns: minmax(0, 38%) minmax(0, 62%) !important;
+    column-gap: 18pt !important;
+    align-items: start !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    color: #000 !important;
+    font: 8.5pt/1.2 Arial, Helvetica, sans-serif !important;
+  }
+
+  .recipe-intro {
+    display: contents !important;
+  }
+
+  .recipe-intro > div:first-child {
+    display: block !important;
+    grid-column: 1 !important;
+  }
+
+  .recipe-intro h2 {
+    margin: 0 !important;
+    color: #000 !important;
+    font: 700 23pt/0.98 Georgia, "Times New Roman", serif !important;
+  }
+
+  .byline {
+    margin: 5pt 0 0 !important;
+    color: #222 !important;
+    font-size: 7.5pt !important;
+  }
+
+  .summary {
+    grid-column: 2 !important;
+    align-self: start !important;
+    max-width: none !important;
+    margin: 0 !important;
+    color: #000 !important;
+    font: 9pt/1.25 Georgia, "Times New Roman", serif !important;
+  }
+
+  .recipe-columns {
+    display: block !important;
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    margin: 10pt 0 0 !important;
+  }
+
+  .recipe-columns section {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 0 7pt !important;
+    break-inside: auto !important;
+  }
+
+  .recipe-columns h3 {
+    column-span: all;
+    margin: 0 0 4pt !important;
+    padding: 0 0 2pt !important;
+    border: 0 !important;
+    border-bottom: 0.75pt solid #000 !important;
+    color: #000 !important;
+    font: 700 7pt/1.1 Arial, Helvetica, sans-serif !important;
+    letter-spacing: 0.12em !important;
+    break-after: avoid !important;
+  }
+
+  .ingredients {
+    display: block !important;
+    columns: 2 !important;
+    column-gap: 20pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-many-ingredients .ingredients,
+  .print-tight .ingredients {
+    columns: 3 !important;
+    column-gap: 14pt !important;
+  }
+
+  .ingredients li {
+    margin: 0 !important;
+    padding: 1pt 0 !important;
+    border: 0 !important;
+    color: #000 !important;
+    line-height: 1.15 !important;
+    break-inside: avoid-column !important;
+  }
+
+  .instructions {
+    display: block !important;
+    columns: 2 !important;
+    column-gap: 20pt !important;
+    column-rule: 0.5pt solid #bbb !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
+    counter-reset: steps !important;
+  }
+
+  .instructions li {
+    position: relative !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 4pt 5pt 23pt !important;
+    color: #000 !important;
+    line-height: 1.2 !important;
+    break-inside: avoid-column !important;
+    counter-increment: steps !important;
+  }
+
+  .instructions li::before {
+    content: counter(steps, decimal-leading-zero) !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    color: #000 !important;
+    font: 700 6.3pt/1 Arial, Helvetica, sans-serif !important;
+  }
+
+  .print-compact {
+    font-size: 7.7pt !important;
+    line-height: 1.14 !important;
+  }
+
+  .print-compact .recipe-intro h2 {
+    font-size: 20pt !important;
+  }
+
+  .print-compact .summary {
+    font-size: 8pt !important;
+    line-height: 1.18 !important;
+  }
+
+  .print-compact .recipe-columns {
+    margin-top: 7pt !important;
+  }
+
+  .print-compact .ingredients li,
+  .print-compact .instructions li {
+    padding-bottom: 3pt !important;
+  }
+
+  .print-tight {
+    font-size: 6.8pt !important;
+    line-height: 1.08 !important;
+  }
+
+  .print-tight .recipe-intro h2 {
+    font-size: 17pt !important;
+  }
+
+  .print-tight .byline {
+    font-size: 6.3pt !important;
+  }
+
+  .print-tight .summary {
+    font-size: 6.9pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .print-tight .recipe-columns {
+    margin-top: 5pt !important;
+  }
+
+  .print-tight .recipe-columns section {
+    margin-bottom: 4pt !important;
+  }
+
+  .print-tight .ingredients li {
+    padding: 0 !important;
+  }
+
+  .print-tight .instructions {
+    column-gap: 14pt !important;
+  }
+
+  .print-tight .instructions li {
+    padding: 0 3pt 2pt 19pt !important;
+    line-height: 1.08 !important;
+  }
+}
